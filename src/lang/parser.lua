@@ -105,13 +105,21 @@ local patt = [=[
    ) -> exportStmt
 
    import_stmt <- (
-      "import" <idsafe> s <import_from>
-   ) -> importStmt
+      "import" <idsafe> s (<import_from> / <import_path>)
+   )
+
+   import_path <- {| <import_path_expr> |} -> importPath
+
+   import_path_expr <- (
+      <ident> "." <import_path_expr>
+      / {:names: {| "{" s <import_name> (s "," s <import_name>)* s "}" |} :}
+      / {:names: {| {| <ident> |} |} :}
+   )
 
    import_from <- (
       {| <import_name> (s "," s <import_name>)* |} s
       "from" <idsafe> s <expr>
-   )
+   ) -> importFrom
 
    import_name <- {|
       <ident> (hs "=" hs <ident>)?
@@ -189,7 +197,7 @@ local patt = [=[
    ) -> declStmt
 
    decorator <- (
-      "@" <ident> hs {| ("(" s <expr_list>? s ")")? |}
+      "@" <term>
    ) -> decorator
 
    guarded_ident <- (
@@ -198,7 +206,7 @@ local patt = [=[
 
    local_decl <- (
       "var" <idsafe> %1 s {| <bind_left> (s "," s <bind_left>)* |}
-      (s "=" s {| <expr_list> |})?
+      (s ({"="} s {| <expr_list> |} / {"in"} <idsafe> s <expr>))?
    ) -> localDecl
 
    local_func <- (
@@ -423,11 +431,15 @@ local patt = [=[
       )? |}
    ) -> term
 
-   expr <- (('' -> curline) (<infix_expr> / <spread_expr>)) -> expr
+   expr <- (('' -> curline) (<in_expr> / <infix_expr> / <spread_expr>)) -> expr
 
    spread_expr <- (
       "..." <term>?
    ) -> spreadExpr
+
+   in_expr <- (
+      {| <ident_list> |} s "in" <idsafe> s <expr>
+   ) -> inExpr
 
    nil_expr <- (
       "nil" <idsafe>
@@ -464,7 +476,8 @@ local patt = [=[
    update_expr <- (
       <bind_left> {|
          (s {:oper: <assop> :} s {:expr: <expr> :})
-         / ((s "," s <bind_left>)* s '=' !'>' s {:list: {| <expr_list> |} :})
+         / ((s "," s <bind_left>)* s {:oper: {'=' !'>' / 'in' <idsafe>} :}
+             s {:list: {| <expr_list> |} :})
       |}?
    ) -> updateExpr
 

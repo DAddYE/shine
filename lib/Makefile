@@ -1,4 +1,4 @@
-SHC = ../boot/bin/shnc ${DEBUG}
+SHC = ../boot/bin/shinec ${DEBUG}
 
 LIBS := ${BUILD}/libs/sys.so \
 	${BUILD}/libs/async.so \
@@ -9,7 +9,7 @@ LIBS := ${BUILD}/libs/sys.so \
 
 all: ${LIBS}
 
-${BUILD}/libs/sys.so: ${BUILD}/libnanomsg.a ${BUILD}/uthread.o
+${BUILD}/libs/sys.so: ${BUILD}/uthread.o
 	${SHC} -n "sys"           sys/init.shn      ${BUILD}/sys.o
 	${SHC} -n "sys.unix"      sys/unix.shn      ${BUILD}/sys_unix.o
 	${SHC} -n "sys.win32"     sys/win32.shn     ${BUILD}/sys_win32.o
@@ -20,23 +20,23 @@ ${BUILD}/libs/sys.so: ${BUILD}/libnanomsg.a ${BUILD}/uthread.o
 	${SHC} -n "sys.ffi.linux" sys/ffi/linux.shn ${BUILD}/sys_ffi_linux.o
 	${SHC} -n "sys.argparse"  sys/argparse.shn  ${BUILD}/sys_argparse.o
 	${SHC} -n "sys.thread"    sys/thread.shn    ${BUILD}/sys_thread.o
-	${SHC} -n "sys.nanomsg"   sys/nanomsg.shn   ${BUILD}/sys_nanomsg.o
 	${CC} ${SOFLAGS} -o ${BUILD}/libs/sys.so ${LDFLAGS} \
 	${BUILD}/sys.o ${BUILD}/sys_unix.o ${BUILD}/sys_win32.o \
 	${BUILD}/sys_ffi.o ${BUILD}/sys_ffi_posix.o ${BUILD}/sys_ffi_osx.o \
 	${BUILD}/sys_ffi_bsd.o ${BUILD}/sys_ffi_linux.o ${BUILD}/sys_argparse.o \
-	${BUILD}/sys_nanomsg.o ${BUILD}/sys_thread.o \
-	${LDPRE} ${BUILD}/libnanomsg.a ${LDPOST} ${BUILD}/uthread.o ${LPTHREAD}
+	${BUILD}/sys_thread.o ${BUILD}/uthread.o ${LPTHREAD}
 
 ${BUILD}/libs/async.so: ${BUILD}/upoll.o
-	${SHC} -n "async"       async/init.shn  ${BUILD}/async.o
-	${SHC} -n "async.fiber" async/fiber.shn ${BUILD}/async_fiber.o
-	${SHC} -n "async.loop"  async/loop.shn  ${BUILD}/async_loop.o
-	${SHC} -n "async.util"  async/util.shn  ${BUILD}/async_util.o
-	${SHC} -n "async.io"    async/io.shn    ${BUILD}/async_io.o
+	${SHC} -n "async"          async/init.shn  ${BUILD}/async.o
+	${SHC} -n "async.fiber"    async/fiber.shn ${BUILD}/async_fiber.o
+	${SHC} -n "async.loop"     async/loop.shn  ${BUILD}/async_loop.o
+	${SHC} -n "async.loop.ffi" async/loop/ffi.shn  ${BUILD}/async_loop_ffi.o
+	${SHC} -n "async.util"     async/util.shn  ${BUILD}/async_util.o
+	${SHC} -n "async.io"       async/io.shn    ${BUILD}/async_io.o
 	${CC} ${SOFLAGS} -o ${BUILD}/libs/async.so ${LDFLAGS} \
 	${BUILD}/upoll.o ${BUILD}/async.o ${BUILD}/async_fiber.o \
-	${BUILD}/async_loop.o ${BUILD}/async_util.o ${BUILD}/async_io.o
+	${BUILD}/async_loop.o ${BUILD}/async_loop_ffi.o \
+	${BUILD}/async_util.o ${BUILD}/async_io.o
 
 ${BUILD}/libs/data.so:
 	${SHC} -n "data.queue" data/queue.shn ${BUILD}/data_queue.o
@@ -54,12 +54,14 @@ ${BUILD}/libs/util.so: ${BUILD}/trex.o
 	${BUILD}/util_time.o ${BUILD}/util_regexp.o ${BUILD}/trex.o \
 	${BUILD}/util_random.o ${BUILD}/util_guards.o
 
-${BUILD}/libs/net.so:
+${BUILD}/libs/net.so: ${BUILD}/libnanomsg.a
 	${SHC} -n "net.socket" net/socket.shn  ${BUILD}/net_socket.o
 	${SHC} -n "net.http" net/http.shn  ${BUILD}/net_http.o
 	${SHC} -n "net.uri" net/uri.shn  ${BUILD}/net_uri.o
+	${SHC} -n "net.nanomsg" net/nanomsg.shn ${BUILD}/net_nanomsg.o
 	${CC} ${SOFLAGS} -o ${BUILD}/libs/net.so ${LDFLAGS} \
-	${BUILD}/net_socket.o ${BUILD}/net_http.o ${BUILD}/net_uri.o
+	${BUILD}/net_socket.o ${BUILD}/net_http.o ${BUILD}/net_uri.o \
+	${BUILD}/net_nanomsg.o ${LDPRE} ${BUILD}/libnanomsg.a ${LDPOST}
 
 ${BUILD}/libs/codec.so:
 	${SHC} -n "codec.base64" codec/base64.shn  ${BUILD}/codec_base64.o
@@ -96,12 +98,16 @@ clean:
 	rm -f ${BUILD}/libnanomsg.a
 
 install:
+	mkdir -p ${PREFIX}/share/shine
 	install -m 0644 ${BUILD}/libs/sys.so ${PREFIX}/lib/shine/sys.so
 	install -m 0644 ${BUILD}/libs/util.so ${PREFIX}/lib/shine/util.so
 	install -m 0644 ${BUILD}/libs/net.so ${PREFIX}/lib/shine/net.so
 	install -m 0644 ${BUILD}/libs/data.so ${PREFIX}/lib/shine/data.so
 	install -m 0644 ${BUILD}/libs/async.so ${PREFIX}/lib/shine/async.so
 	install -m 0644 ${BUILD}/libs/codec.so ${PREFIX}/lib/shine/codec.so
+	mkdir -p ${PREFIX}/share/shine/net
+	cp -r net/ssl ${PREFIX}/share/shine/net
+	cp -r net/ssl.shn ${PREFIX}/share/shine/net
 
 uninstall:
 	rm -f ${PREFIX}/lib/shine/*.so

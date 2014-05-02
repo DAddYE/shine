@@ -1,18 +1,18 @@
-import Thread from "sys.thread"
-import Socket from "sys.nanomsg"
+import sys.thread.Thread
+import net.nanomsg.{NNSocket = Socket}
 
-local ch1 = "inproc://1"
+local ch1 = "ipc:///tmp/foo.ipc"
 
 local th1 = Thread::create =>
 
-   import async from "async"
+   import async.{async}
 
-   nns = Socket(Socket::NN_PAIR)
+   nns = NNSocket(NNSocket::NN_PAIR)
    print("bind:", nns.bind(ch1))
 
    print "Hello from a th1"
    f1 = async =>
-      for i=1, 100000 do
+      for i=1, 150000 do
          --print "[1] tick %{i}"
          nns.send("[1] %{i}")
       end
@@ -25,14 +25,14 @@ end
 local th2 = Thread::create =>
    print "Hello from th2"
 
-   import async from "async"
+   import async.{async}
 
-   nns = Socket(Socket::NN_PAIR)
+   nns = NNSocket(NNSocket::NN_PAIR)
    nns.connect(ch1)
 
    f1 = async =>
       local got
-      for i=1, 100000 do
+      for i=1, 150000 do
          got = nns.recv()
          --print "[2] got: %{got}"
          assert(got != null)

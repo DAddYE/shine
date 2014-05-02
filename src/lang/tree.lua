@@ -119,9 +119,8 @@ function defs.declStmt(deco, node)
    node.decorators = deco
    return node
 end
-function defs.decorator(name, args)
-   name.check = true
-   return { type = "Decorator", name = name, arguments = args }
+function defs.decorator(term)
+   return { type = "Decorator", term = term }
 end
 
 function defs.includeStmt(list)
@@ -137,7 +136,16 @@ end
 function defs.rawExpr(expr)
    return { type = "RawExpression", expression = expr }
 end
-function defs.importStmt(names, from)
+function defs.importFrom(names, from)
+   return { type = "ImportStatement", names = names, from = from }
+end
+function defs.importPath(path)
+   local from  = { }
+   for i=1, #path do
+      from[#from + 1] = path[i].name
+   end
+   from = defs.literal(table.concat(from, '.'))
+   local names = path.names
    return { type = "ImportStatement", names = names, from = from }
 end
 function defs.exportStmt(names)
@@ -459,18 +467,24 @@ end
 function defs.logicalExpr(op, lhs, rhs)
    return { type = "LogicalExpression", operator = op, left = lhs, right = rhs }
 end
-function defs.assignExpr(lhs, rhs)
+function defs.assignExpr(lhs, oper, rhs)
    for i=1, #lhs do
       if lhs[i].type == 'CallExpression' then
          lhs[i].type = 'ApplyPattern'
       end
    end
-   return { type = "AssignmentExpression", left = lhs, right = rhs }
+   return { type = "AssignmentExpression", oper = oper, left = lhs, right = rhs }
 end
 
 function defs.updateExpr(lhs, rhs)
    if rhs then
-      if rhs.oper then
+      if rhs.oper == '=' then
+         return defs.assignExpr({ lhs, unpack(rhs) }, '=', rhs.list)
+      elseif rhs.oper == 'in' then
+         lhs = { lhs, unpack(rhs) }
+         rhs = rhs.list[1]
+         return defs.assignExpr(lhs, 'in', { defs.inExpr(lhs, rhs) })
+      else
          return {
             type     = "UpdateExpression",
             left     = lhs,
@@ -478,16 +492,23 @@ function defs.updateExpr(lhs, rhs)
             right    = rhs.expr
          }
       end
-      return defs.assignExpr({ lhs, unpack(rhs) }, rhs.list)
    else
       return lhs
    end
 end
-function defs.localDecl(name, lhs, rhs)
+
+local valid_lhs = {
+   Identifier   = true,
+   ArrayPattern = true,
+   ApplyPattern = true,
+   TablePattern = true
+}
+
+function defs.localDecl(name, lhs, oper, rhs)
    for i=1, #lhs do
       if lhs[i].type == 'CallExpression' then
          lhs[i].type = 'ApplyPattern'
-      elseif lhs[i].type ~= 'Identifier' then
+      elseif not valid_lhs[lhs[i].type] then
          print(string.format(
             "Error: %s:%s: invalid left hand side in local declaration",
             tostring(name), tostring(line)
@@ -495,8 +516,14 @@ function defs.localDecl(name, lhs, rhs)
          os.exit(1)
       end
    end
+   if oper == 'in' then
+      rhs = { defs.inExpr(lhs, rhs) }
+   end
 
-   return { type = "LocalDeclaration", names = lhs, inits = rhs }
+   return { type = "LocalDeclaration", oper = oper, names = lhs, inits = rhs }
+end
+function defs.inExpr(names, expr)
+   return { type = "InExpression", names = names, expression = expr }
 end
 function defs.doStmt(block)
    return { type = "DoStatement", body = block }

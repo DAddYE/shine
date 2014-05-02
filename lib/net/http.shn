@@ -96,27 +96,53 @@ class HTTPHeaders
       end
       return table::concat(buf, "\r\n")~"\r\n"
    end
+   push(key, val)
+      if self[key] then
+         self[key] ~= (', ' ~ val)
+      else
+         self[key] = val
+      end
+   end
 end
 
 class HTTPEntity
    self(headers, stream)
       self.headers = headers
       self.stream  = stream
+      self.nread   = 0
    end
-   readall()
-      buf = [ ]
-      while true do
-         if self.stream.readable > 0 then
-            got = self.stream.read(1024)
-            if got == nil then
-               break
+   read(len)
+      local max = tonumber(self.headers['Content-Length'])
+      if max and self.nread < max then
+         if len then
+            if len > max then
+               len = max
             end
-            buf.push(got)
+            if self.stream.readable > 0 then
+               got = self.stream.read(len)
+               if got then
+                  self.nread += #got
+               end
+               return got
+            else
+               return nil
+            end
          else
-            break
+            buf = [ ]
+            while true do
+               if self.stream.readable > 0 then
+                  got = self.stream.read(1024)
+                  if got == nil then
+                     break
+                  end
+                  buf.push(got)
+               else
+                  return nil
+               end
+            end
+            return buf.join()
          end
       end
-      return buf.join()
    end
 end
 
@@ -128,7 +154,7 @@ class HTTPRequest
       self.entity   = entity
       self.protocol = protocol
    end
-   want_close()
+   should_close()
       if self.protocol == 'HTTP/1.0' then
          if self.headers['Connection'] then
             return self.headers['Connection'].lower() != 'keep-alive'

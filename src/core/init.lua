@@ -20,7 +20,7 @@ export._VERSION = "0.1.0"
 
 local type, tonumber, tostring = _G.type, _G.tonumber, _G.tostring
 local getmetatable, setmetatable = _G.getmetatable, _G.setmetatable
-local xpcall = _G.xpcall
+local pcall, unpack, select = _G.pcall, _G.unpack, _G.select
 
 local __is__, __match__
 
@@ -48,8 +48,8 @@ Function.__tostring = function(self)
    return string.format('function(%s): %p', table.concat(params,', '), self)
 end
 Function.clone = function(self)
-   copy = loadstring(string.dump(self))
-   info = debug.getinfo(self, 'u')
+   local copy = loadstring(string.dump(self))
+   local info = debug.getinfo(self, 'u')
    for i=1, info.nups do
       debug.upvaluejoin(copy, i, self, i)
    end
@@ -105,7 +105,7 @@ function Module.__call(self, ...)
    end
 
    setfenv(body, setmetatable({ __self__ = module }, { __index = getfenv(2) }))
-   body(setmetatable(module, Module), module, ...)
+   body(setmetatable(module, Module), ...)
    return module
 end
 
@@ -128,7 +128,7 @@ local function module(name, body)
 
    setfenv(body, setmetatable({ __self__ = module }, { __index = getfenv(2) }))
 
-   body(setmetatable(module, Module), module)
+   body(setmetatable(module, Module))
 
    return module
 end
@@ -160,21 +160,21 @@ Object.__members__ = { }
 Object.__include__ = { }
 
 local special = {
-   __add__ = { mmname = '__add', method = function(a, b) return a:__add__(b) end };
-   __sub__ = { mmname = '__sub', method = function(a, b) return a:__sub__(b) end };
-   __mul__ = { mmname = '__mul', method = function(a, b) return a:__mul__(b) end };
-   __div__ = { mmname = '__div', method = function(a, b) return a:__div__(b) end };
-   __pow__ = { mmname = '__pow', method = function(a, b) return a:__pow__(b) end };
-   __mod__ = { mmname = '__mod', method = function(a, b) return a:__mod__(b) end };
-   __len__ = { mmname = '__len', method = function(a, b) return a:__len__(b) end };
-   __unm__ = { mmname = '__unm', method = function(a, b) return a:__unm__(b) end };
-   __get__ = { mmname = '__getindex',  method = function(a, k) return a:__get__(k) end };
-   __set__ = { mmname = '__setindex',  method = function(a, k, v) a:__set__(k, v) end };
-   __concat__ = { mmname = '__concat', method = function(a, b) return a:__concat__(b) end };
-   __pairs__  = { mmname = '__pairs',  method = function(a, b) return a:__pairs__() end };
-   __ipairs__ = { mmname = '__ipairs', method = function(a, b) return a:__ipairs__() end };
-   __call__   = { mmname = '__call',   method = function(self, ...) return self:__call__(...) end };
-   __tostring__ = { mmname = '__tostring', method = function(self, ...) return self:__tostring__(...) end };
+   __add__ = { '__add', function(a, b) return a:__add__(b) end };
+   __sub__ = { '__sub', function(a, b) return a:__sub__(b) end };
+   __mul__ = { '__mul', function(a, b) return a:__mul__(b) end };
+   __div__ = { '__div', function(a, b) return a:__div__(b) end };
+   __pow__ = { '__pow', function(a, b) return a:__pow__(b) end };
+   __mod__ = { '__mod', function(a, b) return a:__mod__(b) end };
+   __len__ = { '__len', function(a, b) return a:__len__(b) end };
+   __unm__ = { '__unm', function(a, b) return a:__unm__(b) end };
+   __get__ = { '__getindex',  function(a, k) return a:__get__(k) end };
+   __set__ = { '__setindex',  function(a, k, v) a:__set__(k, v) end };
+   __concat__ = { '__concat', function(a, b) return a:__concat__(b) end };
+   __pairs__  = { '__pairs',  function(a, b) return a:__pairs__() end };
+   __ipairs__ = { '__ipairs', function(a, b) return a:__ipairs__() end };
+   __call__   = { '__call',   function(self, ...) return self:__call__(...) end };
+   __tostring__ = { '__tostring', function(self, ...) return self:__tostring__(...) end };
 }
 
 local function class(name, body, ...)
@@ -235,11 +235,11 @@ local function class(name, body, ...)
 
    setfenv(body, setmetatable({ __self__ = class }, { __index = getfenv(2) }))
 
-   body(setmetatable(class, Class), class, base.__members__)
+   body(setmetatable(class, Class), base.__members__)
 
    for name, delg in pairs(special) do
       if __members__[name] then
-         class[delg.mmname] = delg.method
+         class[delg[1]] = delg[2]
       end
    end
    if class.__finalize then
@@ -356,14 +356,14 @@ local Array = class("Array", function(self)
    end
    function self.__members__:slice(offset, count)
       local a = Array()
-      for i=offset, offset + count do
+      for i=offset, offset + count - 1 do
          a[a.length] = self[i]
       end
       return a
    end
    function self.__members__:reverse()
       local a = Array()
-      for i = self.length - 1, 0 do
+      for i = self.length - 1, 0, -1 do
          a[a.length] = self[i]
       end
       return a
@@ -434,7 +434,7 @@ local Array = class("Array", function(self)
    function self.__members__:map(f)
       local b = Array()
       for i=0, self.length - 1 do
-         b[i] = f(i, self[i])
+         b[i] = f(self[i])
       end
       return b
    end
@@ -452,7 +452,7 @@ local function try(try, catch, finally)
    return rv
 end
 
-local String = class("String", function(self, super)
+local String = class("String", function(self)
    local string = _G.string
    for k, v in pairs(string) do
       self.__members__[k] = v
@@ -501,7 +501,7 @@ local String = class("String", function(self, super)
 end)
 debug.setmetatable("", String)
 
-local Error = class("Error", function(self, super)
+local Error = class("Error", function(self)
    self.__members__.self = function(self, mesg)
       self.message = mesg
       self.trace = debug.traceback(mesg, 2)
@@ -713,7 +713,7 @@ ArrayPattern = class("ArrayPattern", function(self)
       if getmetatable(that) ~= Array then
          return false
       end
-      for k, v in ipairs(self) do
+      for i, v in ipairs(self) do
          if v ~= __var__ then
             if not __match__(v, that[i]) then
                return false
@@ -792,6 +792,7 @@ ApplyPattern = class("ApplyPattern", function(self)
 end)
 
 local Pattern = setmetatable(getmetatable(lpeg.P(1)), Meta)
+Pattern.__name = 'Pattern'
 Pattern.__call = function(self, ...)
    return self:match(...)
 end
@@ -805,6 +806,21 @@ end
 Pattern.__index.__unapply = function(self, subj)
    return ipairs{ self:match(subj) }
 end
+Pattern.__index.find = function(self, subj, i)
+  local patt = self / 0
+  patt = lpeg.P{ lpeg.Cp() * patt * lpeg.Cp() + 1 * lpeg.V(1) }
+  local i, e = patt:match(subj, i or 1)
+  if i then
+     return i, e - 1
+  else
+     return i
+  end
+end
+Pattern.__index.gsub = function(self, subj, rep)
+  local patt = lpeg.Cs((self / rep + 1)^0)
+  return patt:match(subj)
+end
+
 
 local Grammar = setmetatable({ __name = 'Grammar' }, Meta)
 
@@ -846,7 +862,7 @@ local function grammar(name, body)
    }, Grammar)
 
    setfenv(body, setmetatable({ }, { __index = getfenv(2) }))
-   body(gram, gram)
+   body(gram)
 
    local patt = { }
    for k, v in pairs(members) do
@@ -947,8 +963,8 @@ local function environ(mod)
    return setmetatable(mod, { __index = __magic__ })
 end
 local function warn(msg, lvl)
-   info = debug.getinfo((lvl or 1) + 1, "Sl")
-   tmpl = "%s:%s: %s\n"
+   local info = debug.getinfo((lvl or 1) + 1, "Sl")
+   local tmpl = "%s:%s: %s\n"
    io.stderr:write(tmpl:format(info.short_src, info.currentline, msg))
 end
 
@@ -964,6 +980,13 @@ local CData     = setmetatable({ __name = 'CData'     }, Meta)
 
 for k, v in pairs(table) do
    Table[k] = v
+end
+function Table.keys(t)
+   local ks = { }
+   for k, v in pairs(t) do
+      ks[#ks + 1] = k
+   end
+   return ks
 end
 for k, v in pairs(coroutine) do
    Coroutine[k] = v
@@ -1013,7 +1036,7 @@ end
 local function typeof(a)
    local t = type(a)
    if t == 'table' or t == 'userdata' then
-      m = getmetatable(a)
+      local m = getmetatable(a)
       if m then return m end
    end
    if t == 'cdata' then
@@ -1074,6 +1097,14 @@ local function usrop(op, a, b)
       end
    end
    return h(a, b)
+end
+
+local function __in__(names, expr)
+   local t = { }
+   for i=1, #names do
+      t[i] = expr[names[i]]
+   end
+   return unpack(t, 1, #names)
 end
 
 __magic__ = {
