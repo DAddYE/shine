@@ -323,7 +323,7 @@ local patt = [=[
    ) -> classMember
 
    class_heritage <- (
-      "extends" <idsafe> s <expr> / {| |}
+      "extends" <idsafe> s <ident> / {| |}
    )
 
    prop_defn <- (
@@ -445,7 +445,7 @@ local patt = [=[
       "+" / "-" / "~" / "/" / "**" / "*" / "%" / "^" / "|" / "&"
       / ">>>" / ">>" / ">=" / ">" / "<<" / "<=" / "<" / ".."
       / "!=" / "==" / ":" [-~/*%^|&><!?=]
-      / ("as") <idsafe>
+      / ("is" / "||" / "&&" / "as") <idsafe>
    }
 
    infix_expr  <- (
