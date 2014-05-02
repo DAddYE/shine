@@ -36,15 +36,14 @@ local patt = [=[
    word     <- (%alpha / "_" / "$" / "!" / "?") (%alnum / "_" / "$" / "!" / "?")*
 
    reserved <- (
-      "var" / "function" / "nil" / "true" / "false" / "return"
-      / "break" / "goto" / "not" / "do" / "for" / "in" / "and"
-      / "or" / "while" / "repeat" / "until" / "if" / "else"
+      "var" / "func" / "nil" / "true" / "false" / "return"
+      / "break" / "goto" / "not" / "for" / "in" / "if" / "else"
    ) <idsafe>
 
    keyword  <- (
-      <reserved> / "class" / "module" / "continue" / "throw" / "super"
+      <reserved> / "class" / "module" / "next" / "throw" / "super"
       / "import" / "export" / "try" / "catch" / "finally" / "is" / "as"
-      / "include" / "grammar" / "given" / "case" / "macro"
+      / "include" / "grammar" / "switch" / "case" / "macro"
    ) <idsafe>
 
    sep <- <bcomment>? (<nl> / ";" / <lcomment>) / <ws> <sep>?
@@ -122,8 +121,6 @@ local patt = [=[
       <import_stmt>
       / <export_stmt>
       / <if_stmt>
-      / <while_stmt>
-      / <repeat_stmt>
       / <for_stmt>
       / <for_in_stmt>
       / <do_stmt>
@@ -133,8 +130,8 @@ local patt = [=[
       / <try_stmt>
       / <throw_stmt>
       / <break_stmt>
-      / <continue_stmt>
-      / <given_stmt>
+      / <next_stmt>
+      / <switch_stmt>
       / <label_stmt>
       / <goto_stmt>
       / <expr_stmt>
@@ -156,9 +153,9 @@ local patt = [=[
       "break" <idsafe>
    ) -> breakStmt
 
-   continue_stmt <- (
-      "continue" <idsafe>
-   ) -> continueStmt
+   next_stmt <- (
+      "next" <idsafe>
+   ) -> nextStmt
 
    return_stmt <- (
       "return" <idsafe> {| (hs <expr_list>)? |}
@@ -206,12 +203,12 @@ local patt = [=[
 
    local_func <- (
       "var" <idsafe> s
-      "function" <idsafe> s <ident> s <func_head> s <func_body>
+      "func" <idsafe> s <ident> s <func_head> s <func_body>
    ) -> localFuncDecl
 
    local_coro <- (
       "var" <idsafe> s
-      "function*" <idsafe> s <ident> s <func_head> s <func_body>
+      "func*" <idsafe> s <ident> s <func_head> s <func_body>
    ) -> localCoroDecl
 
    macro_decl <- (
@@ -264,7 +261,7 @@ local patt = [=[
    )
 
    func_decl <- (
-      "function" <idsafe> s {| <qname> |} s <func_head> s <func_body>
+      "func" <idsafe> s {| <qname> |} s <func_head> s <func_body>
    ) -> funcDecl
 
    func_head <- (
@@ -272,7 +269,7 @@ local patt = [=[
    )
 
    func_expr <- (
-      "function" <idsafe> s <func_head> s <func_body>
+      "func" <idsafe> s <func_head> s <func_body>
       / (<func_head> / {| |}) s "=>" (s
          "{" s "=" s {| <expr_list> |} s ("}" / %1 => error)
          / <block_stmt>
@@ -282,12 +279,12 @@ local patt = [=[
    func_body <- <block_stmt>
 
    coro_expr <- (
-      "function*" s <func_head> s <func_body>
+      "func*" s <func_head> s <func_body>
       / "*" <func_head> s "=>" s (hs <expr> / <block_stmt> / %1 => error)
    ) -> coroExpr
 
    coro_decl <- (
-      "function*" s {| <qname> |} s <func_head> s <func_body>
+      "func*" s {| <qname> |} s <func_head> s <func_body>
    ) -> coroDecl
 
    coro_prop <- (
@@ -359,14 +356,14 @@ local patt = [=[
       )
    ) -> ifStmt
 
-   given_stmt <- (
-      "given" <idsafe> s "(" s <expr> s ")" s "{" s
-         ({| <given_case>+ |} / %1 => error)
+   switch_stmt <- (
+      "switch" <idsafe> s "(" s <expr> s ")" s "{" s
+         ({| <switch_case>+ |} / %1 => error)
          (s "else" <idsafe> s <block_stmt>)? s
       ("}" / %1 => error)
-   ) -> givenStmt
+   ) -> switchStmt
 
-   given_case <- (
+   switch_case <- (
       s "case" <idsafe> s "(" s (
            <array_patt>
          / <table_patt>
@@ -375,7 +372,7 @@ local patt = [=[
       {| (s "if" <idsafe> s <expr>)? |}
       s ")"
       s <block_stmt>
-   ) -> givenCase
+   ) -> switchCase
 
    for_stmt <- (
       "for" <idsafe> s "(" s <ident> s "=" s <expr> s "," s <expr>
@@ -390,15 +387,7 @@ local patt = [=[
 
    loop_body <- "{" s <block_stmt> s ("}" / %1 => error)
 
-   do_stmt <- "do" <idsafe> s <loop_body> -> doStmt
-
-   while_stmt <- (
-      "while" <idsafe> s "(" s <expr> s ")" s <loop_body>
-   ) -> whileStmt
-
-   repeat_stmt <- (
-      "repeat" <idsafe> s "{" s <block_stmt> s "}" s ("until" <idsafe> s <expr> / %1 => error)
-   ) -> repeatStmt
+   do_stmt <- <loop_body> -> doStmt
 
    ident <- (
       !<keyword> { <word> }
@@ -456,7 +445,7 @@ local patt = [=[
       "+" / "-" / "~" / "/" / "**" / "*" / "%" / "^" / "|" / "&"
       / ">>>" / ">>" / ">=" / ">" / "<<" / "<=" / "<" / ".."
       / "!=" / "==" / ":" [-~/*%^|&><!?=]
-      / ("or" / "and" / "is" / "as") <idsafe>
+      / ("as") <idsafe>
    }
 
    infix_expr  <- (
@@ -468,8 +457,8 @@ local patt = [=[
    ) -> prefixExpr
 
    assop <- {
-      "+=" / "-=" / "~=" / "**=" / "*=" / "/=" / "%=" / "and="
-      / "|=" / "or=" / "&=" / "^=" / "<<=" / ">>>=" / ">>="
+      "+=" / "-=" / "~=" / "**=" / "*=" / "/=" / "%=" / "&&="
+      / "|=" / "||=" / "&=" / "^=" / "<<=" / ">>>=" / ">>="
    }
 
    update_expr <- (
@@ -492,6 +481,7 @@ local patt = [=[
    table_entries <- (
       <table_entry> (<table_sep> s <table_entry>)* <table_sep>?
    )
+
    table_entry <- {|
       ( {:name: <name> :} / {:expr: "[" s <expr> s "]" :} ) s
       "=" !'>' s {:value: <expr> :}
@@ -663,5 +653,3 @@ end
 return {
    parse = parse
 }
-
-

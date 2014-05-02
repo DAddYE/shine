@@ -689,7 +689,7 @@ function match:MemberExpression(node)
    end
 end
 function match:SelfExpression(node)
-   return 'self'
+   return 'init'
 end
 function match:SuperExpression(node)
    return 'super'
@@ -726,7 +726,7 @@ function match:IfStatement(node)
    return Op{'!if', test, Op{'!do', cons}, Op{'!do', altn } }
 end
 
-function match:GivenStatement(node)
+function match:SwitchStatement(node)
    local body = { }
    local disc = util.genid()
 
@@ -913,7 +913,7 @@ function match:BreakStatement(node)
    end
    return Op{'!break'}
 end
-function match:ContinueStatement(node)
+function match:NextStatement(node)
    if not self.loop then
       self.ctx:fail("no loop to continue")
    end
@@ -1232,7 +1232,8 @@ function match:ClassBodyStatement(node, body)
             Op(prop.key.name) }, decl }}
       else
          -- hack to skip a frame for the constructor
-         if prop.key.name == 'self' then
+         if prop.key.name == 'init' then
+            prop.key.name = 'self'
             prop.value.level = 2
          end
 

@@ -349,17 +349,17 @@ end
 function defs.blockStmt(body)
    return { type = "BlockStatement", body = body }
 end
-function defs.givenStmt(disc, cases, default)
+function defs.switchStmt(disc, cases, default)
    if default then
-      cases[#cases + 1] = defs.givenCase(nil, { }, default)
+      cases[#cases + 1] = defs.switchCase(nil, { }, default)
    end
-   return { type = "GivenStatement", discriminant = disc, cases = cases }
+   return { type = "SwitchStatement", discriminant = disc, cases = cases }
 end
-function defs.givenCase(test, guard, cons)
+function defs.switchCase(test, guard, cons)
    if test and test.type == 'CallExpression' then
       test.type = 'ApplyPattern'
    end
-   return { type = "GivenCase", test = test, guard = guard[1], consequent = cons }
+   return { type = "SwitchCase", test = test, guard = guard[1], consequent = cons }
 end
 
 function defs.returnStmt(args)
@@ -374,8 +374,8 @@ end
 function defs.breakStmt()
    return { type = "BreakStatement" }
 end
-function defs.continueStmt()
-   return { type = "ContinueStatement" }
+function defs.nextStmt()
+   return { type = "NextStatement" }
 end
 function defs.throwStmt(expr)
    return { type = "ThrowStatement", argument = expr }

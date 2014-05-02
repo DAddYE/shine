@@ -93,7 +93,7 @@ libs:
 	git submodule update --init ${DEPDIR}/upoll
 	git submodule update --init ${DEPDIR}/uthread
 	git submodule update --init ${DEPDIR}/nanomsg
-	make -C ./lib
+	# make -C ./lib
 
 ${BUILD}/shine: ${TJ} ${XDEPS}
 	${CC} ${CFLAGS} -I${TVMDIR} -L${TVMDIR} -o ${BUILD}/shine src/shine.c ${LDPRE} ${XDEPS} ${LDPOST} ${LDFLAGS}

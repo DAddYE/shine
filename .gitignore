@@ -6,3 +6,4 @@
 *.la
 *.a
 .*.sw*
+build/
